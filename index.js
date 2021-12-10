@@ -40,21 +40,25 @@ const parsePythonInterface = (paths) => {
   return output;
 };
 
-const parseAbi = (path) => {
-  const str = fs.readFileSync(path, "utf8");
-  const input = JSON.parse(str).abi;
+const parseAbi = (paths) => {
   const event = [];
   const view = [];
   const nonpayable = [];
-  input.forEach((el) => {
-    if (el.type === "event") {
-      return event.push(el.name);
-    }
-    if (el.type === "function") {
-      if (el.stateMutability === "view") return view.push(el.name);
-      return nonpayable.push(el.name);
-    }
+  paths.forEach((path) => {
+    const str = fs.readFileSync(path, "utf8");
+    const input = JSON.parse(str).abi;
+    input.forEach((el) => {
+      if (el.type === "event" && !event.includes(el.name)) {
+        return event.push(el.name);
+      }
+      if (el.type === "function") {
+        if (el.stateMutability === "view" && !view.includes(el.name))
+          return view.push(el.name);
+        if (!nonpayable.includes(el.name)) nonpayable.push(el.name);
+      }
+    });
   });
+
   return {
     event,
     view,
@@ -62,9 +66,12 @@ const parseAbi = (path) => {
   };
 };
 
-const getDiff = (pythonInterfacePath, artifactPath) => {
-  const parsedPython = parsePythonInterface(pythonInterfacePath);
-  const parsedAbi = parseAbi(artifactPath);
+const getDiff = (pythonInterfacePaths, artifactPaths) => {
+  const parsedPython = parsePythonInterface(pythonInterfacePaths);
+  const parsedAbi = parseAbi(artifactPaths);
+
+  console.log(parsedPython)
+  console.log(parsedAbi)
 
   const extraStuff = {};
   const missingStuff = {};
@@ -97,16 +104,14 @@ paths.forEach((pths) => {
   console.log(
     `\n**** COMPARING ${pths[0]
       .map((p) => getFileName(p))
-      .join(", ")} and ${getFileName(pths[1])} ****\n`
+      .join(", ")} and ${pths[1]
+        .map((p) => getFileName(p))
+        .join(", ")} ****\n`
   );
-  console.log(
-    "Interface vs ABI \n"
-  );
+  console.log("Interface vs ABI \n");
   // Present in python interface but not present in contract ABI. Possible reasons: missing, became internal function, changes in contract ...
   console.log(extraStuff);
-  console.log(
-    "\nABI vs interface \n"
-  );
+  console.log("\nABI vs interface \n");
   //Present in contract ABI but not present in python interface. Possible reasons: missing, changes in contract ...
   console.log(missingStuff);
 });
